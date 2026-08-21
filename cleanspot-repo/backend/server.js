@@ -12,7 +12,9 @@ const driveRoutes = require("./routes/drives");
 
 const app = express();
 
-app.use(cors());
+app.use(cors({
+    origin: "https://cleanspot-seven.vercel.app",
+  }));
 app.use(express.json());
 app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 
