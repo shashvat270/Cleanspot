@@ -1,0 +1,1184 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="theme-color" content="#F2F4EE">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><circle cx=%2250%22 cy=%2250%22 r=%2245%22 fill=%22%232F6D4F%22/></svg>">
+<title>CleanSpot — Field Cleanliness Monitoring</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<style>
+  :root{
+    --paper:#F2F4EE;
+    --paper-raised:#FFFFFF;
+    --ink:#1C2B22;
+    --ink-soft:#54604F;
+    --hairline:#D9DCCF;
+    --moss:#2F6D4F;
+    --moss-dark:#1F4A36;
+    --teal:#1F7A72;
+    --amber:#C98A2E;
+    --amber-soft:#F3E3C4;
+    --rust:#B54A2E;
+    --rust-soft:#F3DCD2;
+    --moss-soft:#DCEADF;
+    --shadow: 0 1px 2px rgba(28,43,34,0.06), 0 6px 20px rgba(28,43,34,0.05);
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  html{scroll-behavior:smooth;}
+  body{
+    background:var(--paper);
+    color:var(--ink);
+    font-family:'Inter',sans-serif;
+    -webkit-font-smoothing:antialiased;
+    min-height:100vh;
+  }
+  :focus-visible{outline:2px solid var(--teal);outline-offset:2px;border-radius:4px;}
+  @keyframes fadeIn{from{opacity:0;transform:translateY(4px);}to{opacity:1;transform:translateY(0);}}
+  .fade-in{animation:fadeIn .28s ease both;}
+  .mono{font-family:'IBM Plex Mono',monospace;}
+  h1,h2,h3,.display{font-family:'Fraunces',serif;}
+
+  /* ---- topbar ---- */
+  .topbar{
+    display:flex;align-items:center;justify-content:space-between;
+    padding:16px 28px;border-bottom:1px solid var(--hairline);
+    background:var(--paper-raised);
+    position:sticky;top:0;z-index:50;
+  }
+  .brand{display:flex;align-items:center;gap:10px;}
+  .brand-mark{
+    width:34px;height:34px;border-radius:50%;
+    background:conic-gradient(from 220deg, var(--moss) 0 65%, var(--amber) 65% 85%, var(--rust) 85% 100%);
+    display:flex;align-items:center;justify-content:center;flex-shrink:0;
+    box-shadow: inset 0 0 0 3px var(--paper-raised), inset 0 0 0 4px var(--hairline);
+  }
+  .brand-name{font-family:'Fraunces',serif;font-weight:600;font-size:19px;letter-spacing:-0.01em;}
+  .brand-sub{font-size:11px;color:var(--ink-soft);font-family:'IBM Plex Mono',monospace;letter-spacing:0.02em;}
+
+  .view-toggle{
+    display:flex;background:var(--paper);border:1px solid var(--hairline);border-radius:999px;padding:3px;gap:2px;
+  }
+  .view-toggle button{
+    border:none;background:transparent;padding:8px 18px;border-radius:999px;font-family:'Inter',sans-serif;
+    font-weight:600;font-size:13px;color:var(--ink-soft);cursor:pointer;transition:all .18s ease;
+  }
+  .view-toggle button.active{background:var(--ink);color:var(--paper);}
+
+  .loc-badge{
+    display:flex;align-items:center;gap:7px;font-family:'IBM Plex Mono',monospace;font-size:12px;color:var(--moss-dark);
+    background:var(--moss-soft);padding:6px 12px;border-radius:999px;
+  }
+  .loc-dot{width:7px;height:7px;border-radius:50%;background:var(--moss);animation:pulse 1.8s infinite;}
+  @keyframes pulse{0%,100%{opacity:1;}50%{opacity:.35;}}
+
+  main{max-width:1180px;margin:0 auto;padding:28px;}
+
+  .hidden{display:none !important;}
+
+  /* ---- spot list ---- */
+  .section-label{
+    font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:0.08em;text-transform:uppercase;
+    color:var(--ink-soft);margin-bottom:10px;display:flex;align-items:center;gap:8px;
+  }
+  .section-label::after{content:"";flex:1;height:1px;background:var(--hairline);}
+
+  .spot-grid{display:grid;grid-template-columns:repeat(auto-fill, minmax(230px,1fr));gap:14px;margin-bottom:34px;}
+  .spot-card{
+    background:var(--paper-raised);border:1px solid var(--hairline);border-radius:14px;padding:18px;
+    cursor:pointer;transition:transform .15s ease, box-shadow .15s ease;box-shadow:var(--shadow);
+  }
+  .spot-card:hover{transform:translateY(-2px);box-shadow:0 4px 8px rgba(28,43,34,0.08), 0 12px 28px rgba(28,43,34,0.08);}
+  .spot-card{outline-offset:3px;}
+  @keyframes shimmer{0%{background-position:-200px 0;}100%{background-position:200px 0;}}
+  .skeleton{
+    background:linear-gradient(90deg, var(--hairline) 25%, #ECEEE4 37%, var(--hairline) 63%);
+    background-size:400px 100%;animation:shimmer 1.4s ease infinite;border-radius:6px;
+  }
+  .skel-card{background:var(--paper-raised);border:1px solid var(--hairline);border-radius:14px;padding:18px;}
+  .skel-line{height:12px;margin-bottom:8px;}
+  .spot-top{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:14px;}
+  .spot-name{font-family:'Fraunces',serif;font-weight:600;font-size:17px;line-height:1.25;}
+  .spot-dist{font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--ink-soft);margin-top:3px;}
+  .status-pill{font-family:'IBM Plex Mono',monospace;font-size:10px;font-weight:600;padding:3px 8px;border-radius:6px;white-space:nowrap;}
+  .status-good{background:var(--moss-soft);color:var(--moss-dark);}
+  .status-attn{background:var(--amber-soft);color:#7A5417;}
+  .status-crit{background:var(--rust-soft);color:var(--rust);}
+
+  .mini-gauge{display:flex;align-items:baseline;gap:6px;}
+  .mini-gauge .num{font-family:'IBM Plex Mono',monospace;font-size:26px;font-weight:600;}
+  .mini-gauge .of100{font-family:'IBM Plex Mono',monospace;font-size:12px;color:var(--ink-soft);}
+  .spot-meta{margin-top:10px;font-size:12px;color:var(--ink-soft);display:flex;justify-content:space-between;}
+
+  /* ---- detail ---- */
+  .back-link{
+    display:inline-flex;align-items:center;gap:6px;font-family:'IBM Plex Mono',monospace;font-size:12px;
+    color:var(--ink-soft);cursor:pointer;margin-bottom:18px;background:none;border:none;padding:0;
+  }
+  .back-link:hover{color:var(--ink);}
+
+  .detail-header{display:flex;gap:28px;align-items:flex-start;margin-bottom:28px;flex-wrap:wrap;}
+  .gauge-wrap{position:relative;width:168px;height:168px;flex-shrink:0;}
+  .gauge-center{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;}
+  .gauge-score{font-family:'Fraunces',serif;font-size:38px;font-weight:600;}
+  .gauge-label{font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--ink-soft);text-transform:uppercase;letter-spacing:.06em;}
+
+  .detail-info h2{font-size:26px;margin:0 0 4px 0;}
+  .detail-coords{font-family:'IBM Plex Mono',monospace;font-size:12px;color:var(--ink-soft);margin-bottom:14px;}
+  .detail-stats{display:flex;gap:22px;flex-wrap:wrap;}
+  .stat{}
+  .stat .v{font-family:'IBM Plex Mono',monospace;font-size:20px;font-weight:600;}
+  .stat .l{font-size:11px;color:var(--ink-soft);text-transform:uppercase;letter-spacing:.04em;}
+
+  .btn{
+    font-family:'Inter',sans-serif;font-weight:600;font-size:13px;padding:10px 18px;border-radius:9px;
+    border:1px solid var(--ink);background:var(--ink);color:var(--paper);cursor:pointer;transition:opacity .15s;
+  }
+  .btn:hover{opacity:.85;}
+  .btn:disabled{opacity:.5;cursor:not-allowed;}
+  .btn-outline{background:transparent;color:var(--ink);}
+  .btn-sm{padding:7px 13px;font-size:12px;border-radius:7px;}
+
+  .breakdown{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:14px;margin-bottom:30px;}
+  .bd-item{background:var(--paper-raised);border:1px solid var(--hairline);border-radius:10px;padding:13px 15px;}
+  .bd-top{display:flex;justify-content:space-between;font-size:12px;margin-bottom:8px;}
+  .bd-top .bd-val{font-family:'IBM Plex Mono',monospace;font-weight:600;}
+  .bd-track{height:6px;border-radius:4px;background:var(--hairline);overflow:hidden;}
+  .bd-fill{height:100%;border-radius:4px;}
+
+  /* ---- ticket (report card) ---- */
+  .ticket{
+    background:var(--paper-raised);
+    border:1px solid var(--hairline);
+    border-radius:10px;
+    padding:14px 16px;
+    margin-bottom:10px;
+    position:relative;
+    display:flex;gap:14px;align-items:center;
+    background-image: radial-gradient(circle at 0 50%, var(--paper) 5px, transparent 5.5px), radial-gradient(circle at 100% 50%, var(--paper) 5px, transparent 5.5px);
+  }
+  .ticket-thumb{width:52px;height:52px;border-radius:8px;background:var(--moss-soft);flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:20px;overflow:hidden;}
+  .ticket-thumb img{width:100%;height:100%;object-fit:cover;}
+  .ticket-body{flex:1;min-width:0;}
+  .ticket-cat{font-weight:600;font-size:13.5px;}
+  .ticket-meta{font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--ink-soft);margin-top:2px;}
+  .ticket-status{
+    font-family:'IBM Plex Mono',monospace;font-size:10px;font-weight:600;padding:4px 9px;border-radius:6px;white-space:nowrap;
+  }
+
+  /* ---- modal ---- */
+  .modal-backdrop{
+    position:fixed;inset:0;background:rgba(28,43,34,0.45);display:flex;align-items:center;justify-content:center;
+    z-index:100;padding:20px;animation:backdropIn .15s ease both;
+  }
+  @keyframes backdropIn{from{opacity:0;}to{opacity:1;}}
+  @keyframes modalIn{from{opacity:0;transform:translateY(10px) scale(.98);}to{opacity:1;transform:translateY(0) scale(1);}}
+  .modal{
+    background:var(--paper-raised);border-radius:16px;max-width:460px;width:100%;padding:26px;
+    max-height:88vh;overflow-y:auto;animation:modalIn .22s cubic-bezier(.16,1,.3,1) both;
+  }
+  .modal h3{margin:0 0 4px 0;font-size:20px;}
+  .modal .sub{font-size:12.5px;color:var(--ink-soft);margin-bottom:18px;}
+  .field{margin-bottom:16px;}
+  .field label{display:block;font-size:12px;font-weight:600;margin-bottom:6px;text-transform:uppercase;letter-spacing:.03em;color:var(--ink-soft);}
+  .field select, .field textarea, .field input[type=text], .field input[type=password]{
+    width:100%;padding:10px 12px;border:1px solid var(--hairline);border-radius:8px;font-family:'Inter',sans-serif;font-size:13.5px;background:var(--paper);
+  }
+  .upload-box{
+    border:1.5px dashed var(--hairline);border-radius:10px;padding:20px;text-align:center;cursor:pointer;background:var(--paper);
+  }
+  .upload-box:hover{border-color:var(--moss);}
+  .upload-preview{width:100%;max-height:160px;object-fit:cover;border-radius:8px;margin-top:10px;}
+  .modal-actions{display:flex;gap:10px;margin-top:18px;justify-content:flex-end;}
+
+  .ai-box{
+    background:var(--moss-soft);border-radius:10px;padding:14px 16px;margin-top:14px;font-size:13px;
+    display:flex;gap:10px;align-items:flex-start;
+  }
+  .ai-box.working{background:var(--paper);border:1px solid var(--hairline);}
+  .spinner{width:14px;height:14px;border-radius:50%;border:2px solid var(--hairline);border-top-color:var(--moss);animation:spin .7s linear infinite;flex-shrink:0;margin-top:2px;}
+  @keyframes spin{to{transform:rotate(360deg);}}
+
+  /* status stepper — a compact inline progress tracker used inside report tickets */
+  .stepper{display:flex;flex-wrap:wrap;gap:0;margin-top:8px;}
+  .step{
+    font-family:'IBM Plex Mono',monospace;font-size:9.5px;padding:4px 7px;background:var(--paper);
+    border:1px solid var(--hairline);color:var(--ink-soft);position:relative;white-space:nowrap;
+  }
+  .step:first-child{border-radius:5px 0 0 5px;}
+  .step:last-child{border-radius:0 5px 5px 0;}
+  .step.done{background:var(--moss);border-color:var(--moss);color:#fff;}
+  .step.current{background:var(--amber);border-color:var(--amber);color:#3D2A05;font-weight:600;}
+
+  /* toast notifications */
+  .toast-stack{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);z-index:200;display:flex;flex-direction:column;gap:8px;align-items:center;width:100%;padding:0 16px;pointer-events:none;}
+  .toast{
+    background:var(--ink);color:var(--paper);padding:11px 18px;border-radius:9px;font-size:13px;font-weight:500;
+    box-shadow:0 8px 24px rgba(0,0,0,0.18);max-width:420px;text-align:center;animation:toastIn .22s ease both;
+  }
+  .toast.error{background:var(--rust);}
+  .toast.success{background:var(--moss-dark);}
+  @keyframes toastIn{from{opacity:0;transform:translateY(8px);}to{opacity:1;transform:translateY(0);}}
+
+  /* community */
+  .drive-card{
+    background:var(--paper-raised);border:1px solid var(--hairline);border-radius:14px;padding:20px;
+    display:flex;justify-content:space-between;align-items:center;gap:20px;flex-wrap:wrap;margin-bottom:34px;
+  }
+  .drive-info .row{display:flex;gap:8px;align-items:center;font-size:14px;margin-bottom:4px;}
+  .drive-count{font-family:'IBM Plex Mono',monospace;font-size:12px;color:var(--moss-dark);margin-top:6px;}
+
+  /* before after */
+  .ba-wrap{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:34px;}
+  .ba-card{background:var(--paper-raised);border:1px solid var(--hairline);border-radius:14px;padding:18px;text-align:center;}
+  .ba-card .tag{font-family:'IBM Plex Mono',monospace;font-size:10px;text-transform:uppercase;letter-spacing:.08em;color:var(--ink-soft);margin-bottom:10px;}
+  .ba-visual{
+    height:120px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-family:'Fraunces',serif;font-size:34px;font-weight:600;margin-bottom:10px;
+  }
+  .ba-before .ba-visual{background:var(--rust-soft);color:var(--rust);}
+  .ba-after .ba-visual{background:var(--moss-soft);color:var(--moss-dark);}
+
+  /* ---- admin ---- */
+  .admin-summary{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px;margin-bottom:30px;}
+  .sum-card{background:var(--paper-raised);border:1px solid var(--hairline);border-radius:12px;padding:16px;}
+  .sum-card .v{font-family:'IBM Plex Mono',monospace;font-size:26px;font-weight:600;}
+  .sum-card .l{font-size:11.5px;color:var(--ink-soft);}
+
+  table{width:100%;border-collapse:collapse;background:var(--paper-raised);border:1px solid var(--hairline);border-radius:12px;overflow:hidden;}
+  thead tr{background:var(--paper);}
+  th{text-align:left;font-family:'IBM Plex Mono',monospace;font-size:10.5px;text-transform:uppercase;letter-spacing:.05em;color:var(--ink-soft);padding:11px 14px;border-bottom:1px solid var(--hairline);}
+  td{padding:12px 14px;border-bottom:1px solid var(--hairline);font-size:13.5px;}
+  tr:last-child td{border-bottom:none;}
+  tr.clickable{cursor:pointer;}
+  tr.clickable:hover{background:var(--paper);}
+
+  .escalation-flow{display:flex;align-items:center;gap:0;flex-wrap:wrap;margin:18px 0 26px 0;}
+  .esc-step{
+    background:var(--paper-raised);border:1px solid var(--hairline);border-radius:9px;padding:10px 14px;font-size:12.5px;font-family:'IBM Plex Mono',monospace;
+  }
+  .esc-arrow{color:var(--ink-soft);padding:0 8px;font-size:14px;}
+  .esc-step.active{background:var(--ink);color:var(--paper);border-color:var(--ink);}
+
+  .incident-card{background:var(--paper-raised);border:1px solid var(--hairline);border-radius:14px;padding:22px;margin-bottom:20px;}
+  .incident-id{font-family:'IBM Plex Mono',monospace;font-size:12px;color:var(--ink-soft);}
+  .sev-badge{font-family:'IBM Plex Mono',monospace;font-size:10.5px;font-weight:700;padding:4px 10px;border-radius:6px;}
+
+  /* add-spot map picker */
+  #add-spot-map{height:220px;border-radius:10px;border:1px solid var(--hairline);margin-bottom:10px;}
+  .coord-row{display:flex;gap:10px;}
+  .coord-row .field{flex:1;margin-bottom:0;}
+  .map-hint{font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--ink-soft);margin:-4px 0 14px 0;}
+  .admin-toolbar{display:flex;justify-content:flex-end;margin-bottom:14px;}
+
+  footer{text-align:center;padding:30px;font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--ink-soft);}
+
+  @media (max-width:640px){
+    .topbar{padding:12px 16px;flex-wrap:wrap;gap:10px;}
+    main{padding:16px;}
+    .detail-header{gap:18px;}
+    .ba-wrap{grid-template-columns:1fr;}
+
+    table thead{display:none;}
+    table, table tbody, table tr, table td{display:block;width:100%;}
+    table tr{border-bottom:1px solid var(--hairline);padding:12px 14px;}
+    table tr:last-child{border-bottom:none;}
+    table td{border:none;padding:3px 0;display:flex;justify-content:space-between;gap:10px;}
+    table td::before{content:attr(data-label);font-family:'IBM Plex Mono',monospace;font-size:10.5px;text-transform:uppercase;letter-spacing:.04em;color:var(--ink-soft);}
+    table td:first-child{font-family:'Fraunces',serif;font-size:15px;justify-content:flex-start;padding-bottom:6px;}
+    table td:first-child::before{content:none;}
+  }
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="brand">
+    <div class="brand-mark"></div>
+    <div>
+      <div class="brand-name">CleanSpot</div>
+      <div class="brand-sub">FIELD MONITORING · MVP</div>
+    </div>
+  </div>
+  <div class="view-toggle">
+    <button id="btn-tourist" class="active" onclick="setView('tourist')">Tourist</button>
+    <button id="btn-admin" onclick="setView('admin')">Authority</button>
+  </div>
+  <div class="loc-badge" id="loc-badge"><span class="loc-dot"></span><span id="loc-text">Detecting location…</span></div>
+</div>
+
+<main>
+
+  <!-- ===================== TOURIST VIEW ===================== -->
+  <section id="view-tourist">
+
+    <div id="tourist-list">
+      <div class="section-label">Nearby Tourist Spots</div>
+      <div class="spot-grid" id="spot-grid"></div>
+
+      <div class="section-label">Community Clean-Up</div>
+      <div id="drives-container" style="margin-bottom:34px;">
+        <div class="mono" style="color:var(--ink-soft);font-size:12.5px;">Loading clean-up drives…</div>
+      </div>
+
+      <div class="section-label">Before / After — Example</div>
+      <div class="ba-wrap">
+        <div class="ba-card ba-before">
+          <div class="tag">Before</div>
+          <div class="ba-visual">32</div>
+          <div style="font-size:12.5px;color:var(--ink-soft);">Garbage accumulation · 27 reports</div>
+        </div>
+        <div class="ba-card ba-after">
+          <div class="tag">After</div>
+          <div class="ba-visual">84</div>
+          <div style="font-size:12.5px;color:var(--ink-soft);">Problem resolved ✅ · Evidence verified</div>
+        </div>
+      </div>
+      <div class="mono" style="color:var(--ink-soft);font-size:11px;margin-top:-24px;margin-bottom:34px;">Illustrative — open a spot with a resolved report to see real before/after photos.</div>
+    </div>
+
+    <div id="tourist-detail" class="hidden"></div>
+
+  </section>
+
+  <!-- ===================== ADMIN VIEW ===================== -->
+  <section id="view-admin" class="hidden">
+    <div id="admin-list">
+      <div class="admin-summary" id="admin-summary"></div>
+
+      <div class="section-label">All Tourist Spots</div>
+      <div class="admin-toolbar"><button class="btn btn-sm" onclick="openAddSpotModal()">+ Add Spot</button></div>
+      <table>
+        <thead><tr><th>Spot</th><th>Score</th><th>Status</th><th>Open Issues</th><th>Reports (Total)</th></tr></thead>
+        <tbody id="admin-table"></tbody>
+      </table>
+    </div>
+
+    <div id="admin-detail" class="hidden"></div>
+  </section>
+
+</main>
+
+<footer>CleanSpot — hackathon prototype · mock AI by default (see backend), real backend, mock authority integration</footer>
+
+<div class="toast-stack" id="toast-stack"></div>
+
+
+<!-- Report Modal -->
+<div class="modal-backdrop hidden" id="report-modal">
+  <div class="modal">
+    <h3>Report a Problem</h3>
+    <div class="sub" id="report-modal-sub">at Tourist Spot</div>
+
+    <div class="field">
+      <label>Photo Evidence</label>
+      <div class="upload-box" onclick="document.getElementById('photo-input').click()">
+        <div id="upload-hint">📷 Tap to add a photo</div>
+        <img id="upload-preview" class="upload-preview hidden">
+      </div>
+      <input type="file" id="photo-input" accept="image/*" class="hidden" onchange="onPhotoSelected(event)">
+    </div>
+
+    <div class="field">
+      <label>Category</label>
+      <select id="report-category">
+        <option>Garbage accumulation</option>
+        <option>Overflowing dustbin</option>
+        <option>Dirty toilet</option>
+        <option>Plastic waste</option>
+        <option>Dirty water</option>
+        <option>Bad smell</option>
+        <option>Damaged sanitation facility</option>
+        <option>Other hygiene problem</option>
+      </select>
+    </div>
+
+    <div class="field">
+      <label>Description (optional)</label>
+      <textarea id="report-desc" rows="3" placeholder="Anything else authorities should know…"></textarea>
+    </div>
+
+    <div id="ai-result"></div>
+
+    <div class="modal-actions">
+      <button class="btn btn-outline" onclick="closeReportModal()">Cancel</button>
+      <button class="btn" id="submit-report-btn" onclick="submitReport()">Submit Report</button>
+    </div>
+  </div>
+</div>
+
+<!-- Authority Login Modal -->
+<div class="modal-backdrop hidden" id="login-modal">
+  <div class="modal" style="max-width:360px;">
+    <h3>Authority Login</h3>
+    <div class="sub">Sign in to view the dashboard and manage escalations.</div>
+    <div class="field"><label>Email</label><input type="text" id="login-email" value="admin@cleanspot.local"></div>
+    <div class="field"><label>Password</label><input type="password" id="login-password" value="cleanspot123"></div>
+    <div id="login-error" style="color:var(--rust);font-size:12.5px;margin-bottom:2px;"></div>
+    <div class="modal-actions">
+      <button class="btn btn-outline" onclick="cancelLogin()">Cancel</button>
+      <button class="btn" onclick="adminLogin()">Log In</button>
+    </div>
+  </div>
+</div>
+
+<!-- Add Spot Modal -->
+<div class="modal-backdrop hidden" id="add-spot-modal">
+  <div class="modal">
+    <h3>Add a Tourist Spot</h3>
+    <div class="sub">Click the map to place a pin, or type coordinates directly.</div>
+
+    <div id="add-spot-map"></div>
+    <div class="map-hint">Click anywhere on the map to set the location.</div>
+
+    <div class="field"><label>Name</label><input type="text" id="new-spot-name" placeholder="e.g. Riverside Ghat"></div>
+    <div class="field"><label>Description (optional)</label><textarea id="new-spot-desc" rows="2" placeholder="Short description"></textarea></div>
+    <div class="field"><label>Address (optional)</label><input type="text" id="new-spot-address" placeholder="e.g. Pune, Maharashtra"></div>
+    <div class="coord-row">
+      <div class="field"><label>Latitude</label><input type="text" id="new-spot-lat" placeholder="18.5204" onchange="syncMarkerFromFields()"></div>
+      <div class="field"><label>Longitude</label><input type="text" id="new-spot-lng" placeholder="73.8567" onchange="syncMarkerFromFields()"></div>
+    </div>
+
+    <div id="add-spot-error" style="color:var(--rust);font-size:12.5px;margin-bottom:2px;"></div>
+    <div class="modal-actions">
+      <button class="btn btn-outline" onclick="closeAddSpotModal()">Cancel</button>
+      <button class="btn" id="add-spot-submit-btn" onclick="submitNewSpot()">Add Spot</button>
+    </div>
+  </div>
+</div>
+
+<!-- Hidden input used for uploading before/after resolution evidence -->
+<input type="file" id="after-photo-input" accept="image/*" class="hidden" onchange="onAfterPhotoSelected(event)">
+
+<script>
+/* ---------------- API CONFIG ---------------- */
+// Point this at your running CleanSpot backend (see the backend README).
+const API_BASE = "http://localhost:4000";
+
+const CATS = ["Garbage accumulation","Overflowing dustbin","Dirty toilet","Plastic waste","Dirty water","Bad smell","Damaged sanitation facility","Other hygiene problem"];
+const CAT_ICON = {"Garbage accumulation":"🗑️","Overflowing dustbin":"🚮","Dirty toilet":"🚻","Plastic waste":"🧴","Dirty water":"💧","Bad smell":"👃","Damaged sanitation facility":"🔧","Other hygiene problem":"⚠️"};
+const STATUSES = ["Reported","Under Verification","Verified","Action Required","In Progress","Resolved"];
+
+let spots = [];
+let joined = false;
+let currentSpot = null;
+let currentIncident = null;
+let uploadedFile = null;
+let userLat = null, userLng = null;
+let currentDriveId = null;
+let adminToken = null;
+let adminInfo = null;
+
+/* ---------------- API HELPERS ---------------- */
+async function apiFetch(path, opts = {}) {
+  let res;
+  try {
+    res = await fetch(API_BASE + path, opts);
+  } catch (e) {
+    throw new Error(`Can't reach the API at ${API_BASE} — is the backend running?`);
+  }
+  if (!res.ok) {
+    let msg = `Request failed (${res.status})`;
+    try { const j = await res.json(); if (j.error) msg = j.error; } catch (e) {}
+    throw new Error(msg);
+  }
+  return res.json();
+}
+function authHeaders(){ return adminToken ? { Authorization: `Bearer ${adminToken}` } : {}; }
+function timeAgo(iso){
+  const diffMs = Math.max(0, Date.now() - new Date(iso).getTime());
+  const mins = Math.floor(diffMs/60000);
+  if(mins < 1) return "just now";
+  if(mins < 60) return `${mins}m ago`;
+  const hrs = Math.floor(mins/60);
+  if(hrs < 24) return `${hrs}h ago`;
+  return `${Math.floor(hrs/24)}d ago`;
+}
+
+/* ---------------- TOAST ---------------- */
+function showToast(message, type=''){
+  const stack = document.getElementById('toast-stack');
+  const el = document.createElement('div');
+  el.className = `toast ${type}`;
+  el.textContent = message;
+  stack.appendChild(el);
+  setTimeout(()=>{ el.style.opacity='0'; el.style.transition='opacity .25s'; setTimeout(()=>el.remove(), 250); }, 3200);
+}
+
+/* ---------------- HELPERS ---------------- */
+function statusOf(score){
+  if(score>=70) return {label:"Good", cls:"status-good"};
+  if(score>=40) return {label:"Needs Attention", cls:"status-attn"};
+  return {label:"Critical", cls:"status-crit"};
+}
+function barColor(v){ return v>=70 ? "var(--moss)" : v>=40 ? "var(--amber)" : "var(--rust)"; }
+function stepColor(status){
+  if(status==="Resolved") return "status-good";
+  if(status==="Action Required" || status==="In Progress") return "status-crit";
+  return "status-attn";
+}
+// Renders the full "Reported → ... → Resolved" pipeline as a compact tracker,
+// marking everything up to the current status as done/current.
+function renderStepper(status){
+  const idx = STATUSES.indexOf(status);
+  return `<div class="stepper">${STATUSES.map((s,i)=>{
+    const cls = i < idx ? 'done' : i === idx ? 'current' : '';
+    return `<span class="step ${cls}">${s}</span>`;
+  }).join('')}</div>`;
+}
+function skeletonSpotCards(n=6){
+  return Array.from({length:n}).map(()=>`
+    <div class="skel-card">
+      <div class="skeleton skel-line" style="width:70%;height:16px;"></div>
+      <div class="skeleton skel-line" style="width:40%;"></div>
+      <div class="skeleton skel-line" style="width:50%;height:24px;margin-top:10px;"></div>
+      <div class="skeleton skel-line" style="width:90%;"></div>
+    </div>`).join('');
+}
+
+/* ---------------- LOCATION DETECT ---------------- */
+// Falls back to a fixed demo point (matches the seeded Pune spots) if the
+// browser/OS can't resolve a real position — common on desktops without GPS,
+// where network-based location resolution is often slow or unavailable.
+const FALLBACK_LOCATION = { lat: 19.0760, lng: 72.8777, label: "Pune (default)" };
+
+function detectLocation(){
+  return new Promise((resolve)=>{
+    if(!navigator.geolocation){
+      useFallbackLocation("Geolocation not supported by this browser");
+      resolve();
+      return;
+    }
+    navigator.geolocation.getCurrentPosition(
+      pos=>{
+        userLat = pos.coords.latitude; userLng = pos.coords.longitude;
+        document.getElementById('loc-text').textContent = "Location detected";
+        resolve();
+      },
+      err=>{
+        // err.code: 1 = permission denied, 2 = position unavailable, 3 = timeout
+        const reasons = {1:"permission denied", 2:"position unavailable", 3:"timed out"};
+        useFallbackLocation(reasons[err.code] || err.message);
+        resolve();
+      },
+      {timeout:8000, maximumAge:60000}
+    );
+  });
+}
+function useFallbackLocation(reason){
+  userLat = FALLBACK_LOCATION.lat; userLng = FALLBACK_LOCATION.lng;
+  document.getElementById('loc-text').textContent = `Using ${FALLBACK_LOCATION.label} — GPS ${reason}`;
+  console.warn("[geolocation] falling back:", reason);
+}
+
+/* ---------------- INIT ---------------- */
+async function initTourist(){
+  await detectLocation();
+  await loadSpots();
+  await loadDrive();
+}
+
+/* ---------------- VIEW SWITCH ---------------- */
+function setView(v){
+  document.getElementById('view-tourist').classList.toggle('hidden', v!=='tourist');
+  document.getElementById('view-admin').classList.toggle('hidden', v!=='admin');
+  document.getElementById('btn-tourist').classList.toggle('active', v==='tourist');
+  document.getElementById('btn-admin').classList.toggle('active', v==='admin');
+  if(v==='admin'){
+    document.getElementById('admin-detail').classList.add('hidden');
+    document.getElementById('admin-list').classList.remove('hidden');
+    if(!adminToken){ openLoginModal(); } else { renderAdminList(); }
+  }
+  if(v==='tourist'){ document.getElementById('tourist-detail').classList.add('hidden'); document.getElementById('tourist-list').classList.remove('hidden'); }
+}
+
+/* ---------------- TOURIST: SPOT GRID ---------------- */
+async function loadSpots(){
+  const grid = document.getElementById('spot-grid');
+  grid.innerHTML = skeletonSpotCards();
+  try{
+    const qs = userLat!=null ? `?lat=${userLat}&lng=${userLng}` : "";
+    const data = await apiFetch(`/api/spots${qs}`);
+    spots = data.map(s=>({
+      id:s.id, name:s.name, dist: s.distanceKm!=null ? `${s.distanceKm} km` : "—",
+      score:s.score, waste:s.categoryScores.waste, toilet:s.categoryScores.toilet,
+      general:s.categoryScores.general, water:s.categoryScores.water, area:s.categoryScores.area,
+      reportsToday:s.reportsToday, open:s.openIssues, total:s.totalReports,
+    }));
+    renderSpotGrid();
+  }catch(e){
+    grid.innerHTML = `<div style="grid-column:1/-1;color:var(--rust);font-size:13px;">${e.message}</div>`;
+  }
+}
+function renderSpotGrid(){
+  const grid = document.getElementById('spot-grid');
+  if(!spots.length){
+    grid.innerHTML = `<div style="grid-column:1/-1;color:var(--ink-soft);font-size:13px;">No tourist spots found nearby.</div>`;
+    return;
+  }
+  grid.innerHTML = spots.map(s=>{
+    const st = statusOf(s.score);
+    return `<div class="spot-card fade-in" tabindex="0" role="button" aria-label="View ${s.name}" onclick="openSpot('${s.id}')" onkeydown="if(event.key==='Enter')openSpot('${s.id}')">
+      <div class="spot-top">
+        <div><div class="spot-name">${s.name}</div><div class="spot-dist">${s.dist}</div></div>
+        <span class="status-pill ${st.cls}">${st.label}</span>
+      </div>
+      <div class="mini-gauge"><span class="num" style="color:${barColor(s.score)}">${s.score}</span><span class="of100">/100</span></div>
+      <div class="spot-meta"><span>${s.open} open issues</span><span>${s.reportsToday} today</span></div>
+    </div>`;
+  }).join('');
+}
+async function loadDrive(){
+  const container = document.getElementById('drives-container');
+  try{
+    const drives = await apiFetch('/api/drives');
+    if(!drives.length){
+      container.innerHTML = `<div class="mono" style="color:var(--ink-soft);font-size:12.5px;">No clean-up drives scheduled right now.</div>`;
+      return;
+    }
+    const d = drives[0];
+    currentDriveId = d.id;
+    joined = false;
+    container.innerHTML = `
+      <div class="drive-card">
+        <div class="drive-info">
+          <div class="row" style="font-family:'Fraunces',serif;font-weight:600;font-size:16px;">📍 ${d.spotName || ''} — ${d.title}</div>
+          <div class="row mono" style="color:var(--ink-soft);font-size:12.5px;">${d.timeLabel ? `⏰ ${d.timeLabel} · ` : ''}${new Date(d.date).toLocaleDateString(undefined,{weekday:'long', month:'short', day:'numeric'})}</div>
+          <div class="drive-count" id="drive-count">${d.interestedCount} people interested</div>
+        </div>
+        <button class="btn" id="join-btn" onclick="joinDrive()">Join Clean-Up</button>
+      </div>`;
+  }catch(e){
+    container.innerHTML = `<div style="color:var(--rust);font-size:12.5px;">${e.message}</div>`;
+  }
+}
+
+function gaugeSVG(score, size=168){
+  const r = size/2 - 12;
+  const c = 2*Math.PI*r;
+  const color = barColor(score);
+  return `<svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}">
+    <circle cx="${size/2}" cy="${size/2}" r="${r}" fill="none" stroke="var(--hairline)" stroke-width="12"/>
+    <circle id="gauge-ring" cx="${size/2}" cy="${size/2}" r="${r}" fill="none" stroke="${color}" stroke-width="12"
+      stroke-dasharray="${c}" stroke-dashoffset="${c}" stroke-linecap="round"
+      style="transition:stroke-dashoffset 1s cubic-bezier(.16,1,.3,1);"
+      transform="rotate(-90 ${size/2} ${size/2})"/>
+  </svg>`;
+}
+// Kicks the ring from 0 to the real score and counts the number up, called
+// right after the gauge markup is inserted into the DOM.
+function animateGauge(score, size=168){
+  const r = size/2 - 12;
+  const c = 2*Math.PI*r;
+  const ring = document.getElementById('gauge-ring');
+  const numEl = document.getElementById('gauge-score-num');
+  requestAnimationFrame(()=>{ if(ring) ring.style.strokeDashoffset = c*(1-score/100); });
+  if(numEl){
+    let start = 0;
+    const duration = 700;
+    const t0 = performance.now();
+    function tick(t){
+      const p = Math.min(1, (t-t0)/duration);
+      numEl.textContent = Math.round(score * (1-Math.pow(1-p,3)));
+      if(p<1) requestAnimationFrame(tick);
+    }
+    requestAnimationFrame(tick);
+  }
+}
+
+async function openSpot(id){
+  document.getElementById('tourist-list').classList.add('hidden');
+  const detail = document.getElementById('tourist-detail');
+  detail.classList.remove('hidden');
+  detail.innerHTML = `<button class="back-link" onclick="backToList()">← Nearby Spots</button>
+    <div class="skel-card" style="display:flex;gap:24px;align-items:center;margin-bottom:20px;">
+      <div class="skeleton" style="width:168px;height:168px;border-radius:50%;flex-shrink:0;"></div>
+      <div style="flex:1;"><div class="skeleton skel-line" style="width:50%;height:20px;"></div><div class="skeleton skel-line" style="width:30%;"></div></div>
+    </div>`;
+  try{
+    const s = await apiFetch(`/api/spots/${id}`);
+    currentSpot = {
+      id:s.id, name:s.name, dist: s.distanceKm!=null ? `${s.distanceKm} km` : "",
+      score:s.score, waste:s.categoryScores.waste, toilet:s.categoryScores.toilet,
+      general:s.categoryScores.general, water:s.categoryScores.water, area:s.categoryScores.area,
+      reportsToday:s.reportsToday, open:s.openIssues, total:s.totalReports,
+      reports: s.recentReports.map(r=>({id:r.id, cat:r.category, time:timeAgo(r.createdAt), status:r.status, photoUrl:r.photoUrl})),
+      recentReportsRaw: s.recentReports,
+    };
+    renderTouristDetail();
+    window.scrollTo({top:0, behavior:'smooth'});
+  }catch(e){
+    detail.innerHTML = `<button class="back-link" onclick="backToList()">← Nearby Spots</button><div style="color:var(--rust);font-size:13px;">${e.message}</div>`;
+  }
+}
+
+function renderTouristDetail(){
+  const s = currentSpot;
+  const st = statusOf(s.score);
+  const detail = document.getElementById('tourist-detail');
+  const resolvedWithEvidence = (s.recentReportsRaw||[]).find(r=>r.status==='Resolved' && r.aiAnalysis);
+  detail.innerHTML = `
+    <button class="back-link" onclick="backToList()">← Nearby Spots</button>
+    <div class="detail-header fade-in">
+      <div class="gauge-wrap">
+        ${gaugeSVG(s.score)}
+        <div class="gauge-center">
+          <div class="gauge-score" id="gauge-score-num">0</div>
+          <div class="gauge-label">/ 100</div>
+        </div>
+      </div>
+      <div class="detail-info">
+        <h2>${s.name}</h2>
+        <div class="detail-coords">${s.id} · ${s.dist} away</div>
+        <span class="status-pill ${st.cls}" style="font-size:11.5px;">${st.label}</span>
+        <div class="detail-stats" style="margin-top:16px;">
+          <div class="stat"><div class="v">${s.reportsToday}</div><div class="l">Reports Today</div></div>
+          <div class="stat"><div class="v">${s.open}</div><div class="l">Open Issues</div></div>
+          <div class="stat"><div class="v">${s.total}</div><div class="l">Total Reports</div></div>
+        </div>
+        <button class="btn" style="margin-top:18px;" onclick="openReportModal()">Report a Problem</button>
+      </div>
+    </div>
+
+    <div class="section-label">Score Breakdown</div>
+    <div class="breakdown fade-in">
+      ${["waste,Waste Management","toilet,Toilet Hygiene","general,General Cleanliness","water,Water/Hygiene","area,Surrounding Area"].map(pair=>{
+        const [k,label] = pair.split(",");
+        const v = s[k];
+        return `<div class="bd-item"><div class="bd-top"><span>${label}</span><span class="bd-val">${v}/100</span></div>
+        <div class="bd-track"><div class="bd-fill" style="width:0%;background:${barColor(v)};transition:width .8s cubic-bezier(.16,1,.3,1);" data-target="${v}"></div></div></div>`;
+      }).join('')}
+    </div>
+
+    ${resolvedWithEvidence ? `
+    <div class="section-label">Before / After — Verified Resolution</div>
+    <div class="ba-wrap fade-in">
+      <div class="ba-card ba-before">
+        <div class="tag">Before</div>
+        ${resolvedWithEvidence.photoUrl ? `<img src="${resolvedWithEvidence.photoUrl}" alt="" style="width:100%;height:120px;object-fit:cover;border-radius:10px;margin-bottom:10px;">` : `<div class="ba-visual">📷</div>`}
+        <div style="font-size:12.5px;color:var(--ink-soft);">${resolvedWithEvidence.category}</div>
+      </div>
+      <div class="ba-card ba-after">
+        <div class="tag">After</div>
+        <div class="ba-visual">${s.score}</div>
+        <div style="font-size:12.5px;color:var(--ink-soft);">Problem resolved ✅ · Evidence verified</div>
+      </div>
+    </div>` : ''}
+
+    <div class="section-label">Recent Reports</div>
+    <div id="reports-list" class="fade-in">
+      ${s.reports.length ? s.reports.map(r=>reportTicket(r)).join('') : `<div style="color:var(--ink-soft);font-size:13px;">No reports yet for this spot.</div>`}
+    </div>
+  `;
+  animateGauge(s.score);
+  requestAnimationFrame(()=>{
+    document.querySelectorAll('.bd-fill').forEach(el=>{ el.style.width = el.dataset.target + '%'; });
+  });
+}
+function reportTicket(r){
+  return `<div class="ticket">
+    <div class="ticket-thumb">${r.photoUrl ? `<img src="${r.photoUrl}" alt="">` : (CAT_ICON[r.cat]||"⚠️")}</div>
+    <div class="ticket-body">
+      <div class="ticket-cat">${r.cat}</div>
+      <div class="ticket-meta">${r.time}</div>
+      ${renderStepper(r.status)}
+    </div>
+  </div>`;
+}
+function backToList(){
+  document.getElementById('tourist-detail').classList.add('hidden');
+  document.getElementById('tourist-list').classList.remove('hidden');
+}
+
+/* ---------------- REPORT MODAL ---------------- */
+function openReportModal(){
+  document.getElementById('report-modal-sub').textContent = `at ${currentSpot.name}`;
+  document.getElementById('report-modal').classList.remove('hidden');
+  document.getElementById('ai-result').innerHTML = '';
+  document.getElementById('upload-preview').classList.add('hidden');
+  document.getElementById('upload-hint').classList.remove('hidden');
+  document.getElementById('upload-hint').textContent = "📷 Tap to add a photo";
+  uploadedFile = null;
+  document.getElementById('submit-report-btn').disabled = false;
+  document.getElementById('submit-report-btn').textContent = "Submit Report";
+}
+function closeReportModal(){
+  document.getElementById('report-modal').classList.add('hidden');
+}
+function onPhotoSelected(e){
+  const file = e.target.files[0];
+  if(!file) return;
+  uploadedFile = file;
+  const reader = new FileReader();
+  reader.onload = function(ev){
+    const img = document.getElementById('upload-preview');
+    img.src = ev.target.result;
+    img.classList.remove('hidden');
+    document.getElementById('upload-hint').classList.add('hidden');
+  };
+  reader.readAsDataURL(file);
+  document.getElementById('ai-result').innerHTML =
+    `<div class="ai-box working">📎 Photo attached — AI verification runs when you submit.</div>`;
+}
+function submitReport(){
+  if(!uploadedFile){
+    document.getElementById('ai-result').innerHTML = `<div class="ai-box working" style="color:var(--rust);">Please add a photo before submitting — evidence is required.</div>`;
+    return;
+  }
+  const category = document.getElementById('report-category').value;
+  const description = document.getElementById('report-desc').value;
+  const btn = document.getElementById('submit-report-btn');
+  btn.disabled = true;
+  btn.textContent = "Uploading…";
+  document.getElementById('ai-result').innerHTML =
+    `<div class="ai-box working"><div class="spinner"></div><div>Uploading photo & running AI-assisted verification…</div></div>`;
+
+  const form = new FormData();
+  form.append('photo', uploadedFile);
+  form.append('spotId', currentSpot.id);
+  form.append('category', category);
+  form.append('description', description);
+  if(userLat!=null){ form.append('lat', userLat); form.append('lng', userLng); }
+
+  fetch(`${API_BASE}/api/reports`, { method:'POST', body: form })
+    .then(async res=>{
+      const data = await res.json().catch(()=>({}));
+      if(!res.ok) throw new Error(data.error || `Request failed (${res.status})`);
+      return data;
+    })
+    .then(data=>{
+      const ai = data.report.aiAnalysis;
+      document.getElementById('ai-result').innerHTML = `<div class="ai-box">
+        <div style="font-size:16px;">🤖</div>
+        <div><strong>${ai.detectedCategory}</strong> detected · confidence ${ai.confidence}%<br>
+        <span style="color:var(--ink-soft);font-size:12px;">AI assists verification — serious reports are still checked by the community or an administrator.</span>
+        ${data.escalated ? `<br><span style="color:var(--rust);font-weight:600;font-size:12px;">This spot has been escalated to an authority.</span>` : ''}
+        </div>
+      </div>`;
+      btn.textContent = "Submitted ✓";
+      setTimeout(async ()=>{
+        closeReportModal();
+        await openSpot(currentSpot.id);
+        await loadSpots();
+      }, 1200);
+    })
+    .catch(err=>{
+      document.getElementById('ai-result').innerHTML = `<div class="ai-box working" style="color:var(--rust);">${err.message}</div>`;
+      btn.disabled = false;
+      btn.textContent = "Submit Report";
+    });
+}
+function joinDrive(){
+  if(!currentDriveId || joined) return;
+  fetch(`${API_BASE}/api/drives/${currentDriveId}/join`, {
+    method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({})
+  })
+    .then(async res=>{
+      const data = await res.json().catch(()=>({}));
+      if(!res.ok) throw new Error(data.error || 'Could not join.');
+      return data;
+    })
+    .then(data=>{
+      joined = true;
+      document.getElementById('drive-count').textContent = `${data.interestedCount} people interested`;
+      const btn = document.getElementById('join-btn');
+      btn.textContent = "You're in ✓";
+      btn.classList.add('btn-outline');
+      showToast("You're signed up for the clean-up 🎉", 'success');
+    })
+    .catch(err=> showToast(err.message, 'error'));
+}
+
+/* ---------------- AUTHORITY LOGIN ---------------- */
+function openLoginModal(){
+  document.getElementById('login-error').textContent = '';
+  document.getElementById('login-modal').classList.remove('hidden');
+}
+function cancelLogin(){
+  document.getElementById('login-modal').classList.add('hidden');
+  setView('tourist');
+}
+async function adminLogin(){
+  const email = document.getElementById('login-email').value;
+  const password = document.getElementById('login-password').value;
+  const errBox = document.getElementById('login-error');
+  errBox.textContent = '';
+  try{
+    const data = await apiFetch('/api/auth/login', {
+      method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({email,password})
+    });
+    adminToken = data.token;
+    adminInfo = data.admin;
+    document.getElementById('login-modal').classList.add('hidden');
+    renderAdminList();
+  }catch(e){
+    errBox.textContent = e.message;
+  }
+}
+function adminLogout(){
+  adminToken = null;
+  adminInfo = null;
+  setView('admin'); // reopens the login modal since adminToken is now null
+}
+
+/* ---------------- ADMIN VIEW ---------------- */
+async function renderAdminList(){
+  const summary = document.getElementById('admin-summary');
+  const table = document.getElementById('admin-table');
+  summary.innerHTML = Array.from({length:4}).map(()=>`<div class="skel-card"><div class="skeleton skel-line" style="width:50%;height:22px;"></div><div class="skeleton skel-line" style="width:70%;"></div></div>`).join('');
+  try{
+    const data = await apiFetch('/api/admin/dashboard', { headers: authHeaders() });
+    summary.innerHTML = `
+      <div class="sum-card fade-in" style="grid-column:1/-1;display:flex;justify-content:space-between;align-items:center;background:transparent;border:none;padding:0 0 4px 0;">
+        <div class="mono" style="font-size:12px;color:var(--ink-soft);">Signed in as ${adminInfo ? adminInfo.name : 'Authority'} ${adminInfo ? `(${adminInfo.role})` : ''}</div>
+        <button class="btn btn-outline btn-sm" onclick="adminLogout()">Log Out</button>
+      </div>
+      <div class="sum-card fade-in"><div class="v">${data.totalSpots}</div><div class="l">Total Spots</div></div>
+      <div class="sum-card fade-in"><div class="v" style="color:var(--moss)">${data.good}</div><div class="l">🟢 Good</div></div>
+      <div class="sum-card fade-in"><div class="v" style="color:var(--amber)">${data.attention}</div><div class="l">🟡 Needs Attention</div></div>
+      <div class="sum-card fade-in"><div class="v" style="color:var(--rust)">${data.critical}</div><div class="l">🔴 Critical</div></div>
+      <div class="sum-card fade-in"><div class="v">${data.totalReports}</div><div class="l">Total Reports</div></div>
+      <div class="sum-card fade-in"><div class="v">${data.openIssues}</div><div class="l">Open Issues</div></div>
+      <div class="sum-card fade-in"><div class="v">${data.resolvedIssues}</div><div class="l">Resolved</div></div>
+    `;
+    table.innerHTML = data.spots.map(s=>{
+      const st = statusOf(s.score);
+      return `<tr class="clickable fade-in" onclick="openAdminSpot('${s.id}')" tabindex="0" role="button" onkeydown="if(event.key==='Enter')openAdminSpot('${s.id}')">
+        <td data-label="Spot" style="font-weight:600;">${s.name}</td>
+        <td data-label="Score" class="mono" style="color:${barColor(s.score)}">${s.score}/100</td>
+        <td data-label="Status"><span class="status-pill ${st.cls}">${st.label}</span></td>
+        <td data-label="Open Issues" class="mono">${s.openIssues}</td>
+        <td data-label="Total Reports" class="mono">${s.totalReports}</td>
+      </tr>`;
+    }).join('');
+  }catch(e){
+    if(/401|token|auth/i.test(e.message)){
+      adminToken = null;
+      openLoginModal();
+      return;
+    }
+    summary.innerHTML = `<div style="grid-column:1/-1;color:var(--rust);font-size:13px;">${e.message}</div>`;
+  }
+}
+
+async function openAdminSpot(id){
+  document.getElementById('admin-list').classList.add('hidden');
+  const detail = document.getElementById('admin-detail');
+  detail.classList.remove('hidden');
+  detail.innerHTML = `<div class="skel-card"><div class="skeleton skel-line" style="width:40%;height:20px;"></div><div class="skeleton skel-line" style="width:60%;"></div><div class="skeleton skel-line" style="width:80%;height:60px;margin-top:10px;"></div></div>`;
+  try{
+    const [spot, incidents] = await Promise.all([
+      apiFetch(`/api/spots/${id}`),
+      apiFetch('/api/admin/incidents', { headers: authHeaders() }),
+    ]);
+    currentSpot = spot;
+    currentIncident = incidents.find(i => i.spot && i.spot.id === id) || null;
+    renderAdminDetail();
+  }catch(e){
+    detail.innerHTML = `<button class="back-link" onclick="backToAdminList()">← Dashboard</button><div style="color:var(--rust);font-size:13px;">${e.message}</div>`;
+  }
+}
+
+function renderAdminDetail(){
+  const s = currentSpot;
+  const st = statusOf(s.score);
+  const incident = currentIncident;
+  const escLabels = ["Application","Local Sanitation Authority","District / Tourism Authority","State-Level Authority"];
+  const levelIndex = { Local:1, District:2, State:3 };
+  const escLevel = incident ? (levelIndex[incident.authorityLevel] || 1) : 0;
+  const detail = document.getElementById('admin-detail');
+
+  detail.innerHTML = `
+    <button class="back-link" onclick="backToAdminList()">← Dashboard</button>
+
+    <div class="incident-card fade-in">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:10px;">
+        <div>
+          <div class="incident-id">${s.id}</div>
+          <h2 style="margin:6px 0 0 0;">${s.name} — ${s.score}/100</h2>
+        </div>
+        <span class="status-pill ${st.cls}" style="font-size:12px;">${st.label}</span>
+      </div>
+
+      <div class="section-label" style="margin-top:20px;">Escalation Path</div>
+      <div class="escalation-flow">
+        ${escLabels.map((l,i)=>`<span class="esc-step ${i<=escLevel?'active':''}">${l}</span>${i<escLabels.length-1?'<span class="esc-arrow">→</span>':''}`).join('')}
+      </div>
+      ${incident ? `<div style="background:var(--rust-soft);color:var(--rust);padding:12px 16px;border-radius:9px;font-size:13px;margin-bottom:16px;">
+        <strong>${incident.severity} Cleanliness Incident</strong> — escalated to ${incident.authorityLevel} authority · status: ${incident.status}
+      </div>` : `<div style="color:var(--ink-soft);font-size:12.5px;margin-bottom:16px;">No active escalation for this spot right now.</div>`}
+
+      <div class="detail-stats">
+        <div class="stat"><div class="v">${s.totalReports}</div><div class="l">Total Reports</div></div>
+        <div class="stat"><div class="v">${s.openIssues}</div><div class="l">Open Issues</div></div>
+        <div class="stat"><div class="v">${s.reportsToday}</div><div class="l">Reports Today</div></div>
+      </div>
+    </div>
+
+    <div class="section-label">Reports for this Spot</div>
+    <div class="fade-in">${s.recentReports.length ? s.recentReports.map(r=>reportTicketAdmin(r)).join('') : `<div style="color:var(--ink-soft);font-size:13px;">No reports yet.</div>`}</div>
+  `;
+}
+
+function reportTicketAdmin(r){
+  const showActions = r.status !== 'Resolved';
+  return `<div class="ticket">
+    <div class="ticket-thumb">${r.photoUrl ? `<img src="${r.photoUrl}" alt="">` : (CAT_ICON[r.category]||"⚠️")}</div>
+    <div class="ticket-body">
+      <div class="ticket-cat">${r.category}</div>
+      <div class="ticket-meta">${timeAgo(r.createdAt)}${r.aiAnalysis && r.aiAnalysis.confidence ? ` · AI ${r.aiAnalysis.confidence}%` : ''}</div>
+      ${renderStepper(r.status)}
+      ${showActions ? `<div style="margin-top:8px;display:flex;gap:8px;flex-wrap:wrap;">
+        <button class="btn btn-sm btn-outline" onclick="advanceReportStatus('${r.id}')">Advance Status</button>
+        <button class="btn btn-sm" onclick="startResolve('${r.id}')">Resolve (Before/After)</button>
+      </div>` : ''}
+    </div>
+  </div>`;
+}
+
+function backToAdminList(){
+  document.getElementById('admin-detail').classList.add('hidden');
+  document.getElementById('admin-list').classList.remove('hidden');
+  renderAdminList();
+}
+
+async function advanceReportStatus(reportId){
+  const report = currentSpot.recentReports.find(r=>r.id===reportId);
+  if(!report) return;
+  const idx = STATUSES.indexOf(report.status);
+  if(idx >= STATUSES.length-1) return;
+  const nextStatus = STATUSES[idx+1];
+  try{
+    await apiFetch(`/api/reports/${reportId}/status`, {
+      method:'PATCH',
+      headers:{ 'Content-Type':'application/json', ...authHeaders() },
+      body: JSON.stringify({ status: nextStatus }),
+    });
+    showToast(`Status updated to "${nextStatus}"`, 'success');
+    await openAdminSpot(currentSpot.id);
+  }catch(e){ showToast(e.message, 'error'); }
+}
+
+function startResolve(reportId){
+  pendingResolveReportId = reportId;
+  document.getElementById('after-photo-input').click();
+}
+
+async function onAfterPhotoSelected(e){
+  const file = e.target.files[0];
+  e.target.value = ''; // reset so picking the same file again still fires change
+  if(!file || !pendingResolveReportId) return;
+  const form = new FormData();
+  form.append('afterPhoto', file);
+  try{
+    const res = await fetch(`${API_BASE}/api/reports/${pendingResolveReportId}/resolve`, {
+      method:'POST', headers: authHeaders(), body: form,
+    });
+    const data = await res.json().catch(()=>({}));
+    if(!res.ok) throw new Error(data.error || 'Could not resolve report.');
+    pendingResolveReportId = null;
+    showToast('Marked resolved — score updated with verified evidence ✅', 'success');
+    await openAdminSpot(currentSpot.id);
+  }catch(err){ showToast(err.message, 'error'); }
+}
+
+/* ---------------- ADD SPOT (map picker) ---------------- */
+let addSpotMap = null;
+let addSpotMarker = null;
+
+function openAddSpotModal(){
+  document.getElementById('add-spot-error').textContent = '';
+  ['new-spot-name','new-spot-desc','new-spot-address','new-spot-lat','new-spot-lng'].forEach(id=>{
+    document.getElementById(id).value = '';
+  });
+  document.getElementById('add-spot-modal').classList.remove('hidden');
+
+  // Leaflet needs the container visible before it can size itself correctly,
+  // so (re)initialize on open rather than at page load.
+  setTimeout(()=>{
+    const centerLat = userLat ?? FALLBACK_LOCATION.lat;
+    const centerLng = userLng ?? FALLBACK_LOCATION.lng;
+    if(!addSpotMap){
+      addSpotMap = L.map('add-spot-map').setView([centerLat, centerLng], 12);
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '&copy; OpenStreetMap contributors', maxZoom: 18,
+      }).addTo(addSpotMap);
+      addSpotMap.on('click', (e)=> placeSpotMarker(e.latlng.lat, e.latlng.lng));
+    } else {
+      addSpotMap.invalidateSize();
+      addSpotMap.setView([centerLat, centerLng], 12);
+    }
+  }, 50);
+}
+function placeSpotMarker(lat, lng){
+  document.getElementById('new-spot-lat').value = lat.toFixed(5);
+  document.getElementById('new-spot-lng').value = lng.toFixed(5);
+  if(addSpotMarker){ addSpotMarker.setLatLng([lat, lng]); }
+  else { addSpotMarker = L.marker([lat, lng]).addTo(addSpotMap); }
+}
+// Keep the marker in sync if someone edits the coordinate fields by hand.
+function syncMarkerFromFields(){
+  const lat = parseFloat(document.getElementById('new-spot-lat').value);
+  const lng = parseFloat(document.getElementById('new-spot-lng').value);
+  if(Number.isFinite(lat) && Number.isFinite(lng) && addSpotMap){
+    placeSpotMarker(lat, lng);
+    addSpotMap.setView([lat, lng], addSpotMap.getZoom());
+  }
+}
+function closeAddSpotModal(){
+  document.getElementById('add-spot-modal').classList.add('hidden');
+}
+async function submitNewSpot(){
+  const name = document.getElementById('new-spot-name').value.trim();
+  const description = document.getElementById('new-spot-desc').value.trim();
+  const address = document.getElementById('new-spot-address').value.trim();
+  const lat = parseFloat(document.getElementById('new-spot-lat').value);
+  const lng = parseFloat(document.getElementById('new-spot-lng').value);
+  const errBox = document.getElementById('add-spot-error');
+
+  if(!name){ errBox.textContent = 'Name is required.'; return; }
+  if(!Number.isFinite(lat) || !Number.isFinite(lng)){ errBox.textContent = 'Click the map or enter valid coordinates.'; return; }
+
+  const btn = document.getElementById('add-spot-submit-btn');
+  btn.disabled = true; btn.textContent = 'Adding…';
+  try{
+    await apiFetch('/api/spots', {
+      method:'POST',
+      headers:{ 'Content-Type':'application/json', ...authHeaders() },
+      body: JSON.stringify({ name, description, address, lat, lng }),
+    });
+    showToast(`${name} added ✅`, 'success');
+    closeAddSpotModal();
+    await renderAdminList();
+  }catch(e){
+    errBox.textContent = e.message;
+  }finally{
+    btn.disabled = false; btn.textContent = 'Add Spot';
+  }
+}
+
+/* ---------------- MODAL UX: click-outside + Escape to close ---------------- */
+document.querySelectorAll('.modal-backdrop').forEach(backdrop=>{
+  backdrop.addEventListener('click', (e)=>{
+    if(e.target !== backdrop) return; // only when the dimmed area itself is clicked, not the modal content
+    if(backdrop.id === 'report-modal') closeReportModal();
+    if(backdrop.id === 'login-modal') cancelLogin();
+    if(backdrop.id === 'add-spot-modal') closeAddSpotModal();
+  });
+});
+document.addEventListener('keydown', (e)=>{
+  if(e.key !== 'Escape') return;
+  if(!document.getElementById('report-modal').classList.contains('hidden')) closeReportModal();
+  else if(!document.getElementById('login-modal').classList.contains('hidden')) cancelLogin();
+  else if(!document.getElementById('add-spot-modal').classList.contains('hidden')) closeAddSpotModal();
+});
+
+/* init */
+let pendingResolveReportId = null;
+initTourist();
+</script>
+</body>
+</html>
