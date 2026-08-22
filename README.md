@@ -65,6 +65,48 @@ Change it before deploying anywhere real; see [SECURITY.md](SECURITY.md).
 - **AI verification:** pluggable — mock classifier by default, or Claude's vision API
 - **Photo storage:** local disk in dev (swap for Cloudinary/S3/Firebase Storage in production)
 
+## Live demo
+
+- **App:** [https://cleanspot-seven.vercel.app](https://cleanspot-seven.vercel.app)
+- **API health check:** [https://cleanspot-backend.onrender.com/api/health](https://cleanspot-backend.onrender.com/api/health)
+
+Note: the backend is hosted on Render's free tier, which spins down after periods of inactivity —
+the first request after a while may take 30-60 seconds to respond while it wakes up.
+
+## Team & contributions
+
+| Name | Contribution |
+|---|---|
+| Shashvat Kawali | Backend API, MongoDB data models, cleanliness scoring & escalation engine, deployment (Render + Vercel), testing |
+| Aayush Jha | Frontend UI/UX, admin dashboard, map-based spot picker, documentation |
+
+## Third-party attribution
+
+This project uses the following third-party libraries, frameworks, and services:
+
+**Backend**
+- [Express](https://expressjs.com/) — web framework (MIT License)
+- [Mongoose](https://mongoosejs.com/) — MongoDB object modeling (MIT License)
+- [MongoDB Atlas](https://www.mongodb.com/atlas) — hosted database
+- [jsonwebtoken](https://github.com/auth0/node-jsonwebtoken) — JWT auth (MIT License)
+- [bcryptjs](https://github.com/dcodeIO/bcrypt.js) — password hashing (MIT License)
+- [multer](https://github.com/expressjs/multer) — file upload handling (MIT License)
+- [dotenv](https://github.com/motdotla/dotenv) — environment variable loading (BSD-2-Clause)
+- [cors](https://github.com/expressjs/cors) — CORS middleware (MIT License)
+
+**Frontend**
+- [Leaflet](https://leafletjs.com/) — interactive map for the admin spot picker (BSD-2-Clause)
+- [OpenStreetMap](https://www.openstreetmap.org/copyright) — map tile data,
+  © OpenStreetMap contributors, ODbL license
+- [Google Fonts](https://fonts.google.com/) — Fraunces, Inter, IBM Plex Mono (SIL Open Font License)
+
+**Hosting**
+- [Vercel](https://vercel.com/) — frontend hosting
+- [Render](https://render.com/) — backend hosting
+
+No proprietary or unlicensed third-party code is used. All dependencies above are open-source
+under permissive licenses compatible with this project's MIT license.
+
 ## Project status
 
 This is a hackathon-originated MVP, not a production deployment. It intentionally does **not**
@@ -75,3 +117,4 @@ before deploying this anywhere beyond a local demo.
 ## License
 
 MIT — see [LICENSE](LICENSE).
+
